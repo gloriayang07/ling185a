@@ -1,0 +1,11 @@
+# ignore Assignment1, it wasn't a coding assignment
+Assignment1/
+
+# ignore notes from the class
+Notes/
+
+# ignore all pdf files
+*.pdf
+
+# ignore DS_Store
+*.DS_Store
