@@ -1,1 +1,1 @@
-# ling185a
+# ling185a - Computational Linguistics
