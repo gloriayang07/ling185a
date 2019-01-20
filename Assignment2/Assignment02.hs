@@ -79,10 +79,31 @@ prefix n l = case n of
 -- [3] Recursive functions on the RegExp type
 
 -- returns the number of occurrences of the star operator in the given regular expression
--- countStars :: RegExp -> Numb
+countStars :: RegExp -> Numb
+countStars r = case r of
+                 Lit x -> Z
+                 Alt r1 r2 -> add (countStars r1) (countStars r2)
+                 Concat r1 r2 -> add (countStars r1) (countStars r2)
+                 Star r -> add one (countStars r)
+                 ZeroRE -> Z
+                 OneRE -> Z
 
 -- returns the length of the longest root-to-leaf sequence of nodes in this tree for the given regular expression
--- depth :: RegExp -> Numb
+depth :: RegExp -> Numb
+depth r = case r of
+            Lit x -> S Z
+            Alt r1 r2 -> add one (bigger (depth r1) (depth r2))
+            Concat r1 r2 -> add one (bigger (depth r1) (depth r2))
+            Star r -> add one (depth r)
+            ZeroRE -> S Z
+            OneRE -> S Z
 
 -- returns the string representing the given regular expression in the notation we used in class, with some obvious simplifications
--- reToString :: RegExp -> [Char]
+reToString :: RegExp -> [Char]
+reToString r = case r of
+                Lit x -> [x]
+                Alt r1 r2 -> "(" ++ (reToString r1) ++ "|" ++ (reToString r2) ++ ")"
+                Concat r1 r2 -> "(" ++ (reToString r1) ++ "." ++ (reToString r2) ++ ")"
+                Star r -> (reToString r) ++ "*"
+                ZeroRE -> "0"
+                OneRE ->  "1"
