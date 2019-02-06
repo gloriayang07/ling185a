@@ -64,13 +64,94 @@ mapStates f (start, ends, delta) =
 --            Write all your code below this line.
 ------------------------------------------------------------------
 
-backwardsCheck :: (Ord st, Ord sy) => Automaton st sy -> [sy] -> st -> Bool
-backwardsCheck fsa str q =
+-- 1
+backwardCheck :: (Ord st, Ord sy) => Automaton st sy -> [sy] -> st -> Bool
+backwardCheck fsa str q =
     let (start, ends, delta) = fsa in
     let states = allStates fsa in
     case str of
-ε -> q == start
-x1 x2 . . . xn−1 xn -> or (map (\q’ -> forwardCheck fsa x1 x2 . . . xn−1 q’ && elem
-(q’,xn ,q)
-delta) states)
+        [] -> elem q ends
+        x : rest -> or (map (\q' -> backwardCheck fsa rest q' && elem (q, x, q') delta) states)
 
+-- 2.1 helper function
+recursiveRecognizeSLG :: (Ord sy) => SLG sy -> [sy] -> Bool
+recursiveRecognizeSLG slg str =
+    let (s, f, t) = slg in
+    case str of
+        [] -> True -- we're reached the end of the list
+        x : rest -> case rest of
+                    [] -> elem x f -- here x is the last symbol
+                    y : tail -> elem (x,y) t && recursiveRecognizeSLG slg rest
+
+-- 2.1
+recognizeSLG :: (Ord sy) => SLG sy -> [sy] -> Bool
+recognizeSLG slg str =
+    let (s, f, t) = slg in
+    case str of
+        [] -> False
+        x : rest -> elem x s && recursiveRecognizeSLG slg str
+
+-- 2.2
+-- ExtraState is the start state
+-- Array of end states is an array of (StateForSymbol sy), where sy is every element in f
+-- Transition from (ExtraState, sy, StateForSymbol sy), where sy is every element in s
+-- Transition from (StateForSymbol sy1, sy2, StateForSymbol sy2) for every (sy1, sy2) in t
+slgToFSA :: SLG sy -> Automaton (ConstructedState sy) sy
+slgToFSA slg =
+    let (s, f, t) = slg in
+    let startState = ExtraState in
+    let endStates = map (\elemF -> StateForSymbol elemF) f in
+    let startTransitions = map (\elemS -> (ExtraState, elemS, StateForSymbol elemS)) s in
+    let otherTransitions = map (\(sy1, sy2) -> (StateForSymbol sy1, sy2, StateForSymbol sy2)) t in
+        (startState, endStates, startTransitions ++ otherTransitions)
+
+-- 3: union
+unionFSAs :: (Ord sy) => EpsAutomaton Int sy -> EpsAutomaton Int sy -> EpsAutomaton Int sy
+unionFSAs m m' =
+    let startState = 40 in
+    let (start, ends, delta) = ensureUnused [startState] m in
+    let (start', ends', delta') = ensureUnused ((allStates m) ++ [startState]) m' in
+    let newStart = startState in
+    let newEnds = ends ++ ends' in
+    let newStartTransitions = [(newStart, Nothing, start), (newStart, Nothing, start')] in
+    let newDelta = newStartTransitions ++ delta ++ delta' in
+        (newStart, newEnds, newDelta)
+
+-- 3: concat
+concatFSAs :: (Ord sy) => EpsAutomaton Int sy -> EpsAutomaton Int sy -> EpsAutomaton Int sy
+concatFSAs m m' =
+    let (start, ends, delta) = m in
+    let (start', ends', delta') = ensureUnused (allStates m) m' in
+    let newStart = start in
+    let newEnds = ends' in
+    let connectionTransitions = map (\endState -> (endState, Nothing, start')) ends in
+    let newDelta = connectionTransitions ++ delta ++ delta' in
+        (newStart, newEnds, newDelta)
+
+-- 3: star
+starFSA :: (Ord sy) => EpsAutomaton Int sy -> EpsAutomaton Int sy
+starFSA m =
+    let startState = 40 in
+    let (start, ends, delta) = ensureUnused [startState] m in
+    let newStart = startState in
+    let newEnds = ends ++ [newStart] in
+    let newStartTransition = [(newStart, Nothing, start)] in
+    let newOtherTransitions = map (\endState -> (endState, Nothing, start)) ends in
+    let newDelta = newStartTransition ++ newOtherTransitions ++ delta in
+        (newStart, newEnds, newDelta)
+
+-- 3: reToFSA
+reToFSA :: (Ord sy) => RegExp sy -> EpsAutomaton Int sy
+reToFSA r =
+    let literalStart = 50 in
+    let literalEnd = 51 in
+    let zeroState = 52 in
+    let oneState = 53 in
+    let avoidThese = [literalStart, literalEnd, zeroState, oneState] in
+                case r of
+                Lit x -> (literalStart, [literalEnd], [(literalStart, Just x, literalEnd)])
+                Alt r1 r2 -> unionFSAs (ensureUnused avoidThese (reToFSA r1)) (ensureUnused avoidThese (reToFSA r2))
+                Concat r1 r2 -> concatFSAs (ensureUnused avoidThese (reToFSA r1)) (ensureUnused avoidThese (reToFSA r2))
+                Star r -> starFSA (ensureUnused avoidThese (reToFSA r))
+                ZeroRE -> (zeroState, [], [])
+                OneRE -> (oneState, [oneState], [])
