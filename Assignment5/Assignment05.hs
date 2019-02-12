@@ -83,6 +83,7 @@ instance Semiring [String] where
              gtrue = [[]]
              gfalse = []
 
+-- J
 gfsa4 :: GenericAutomaton Int Char [String]
 gfsa4 = (   [ (0, [[]]) ],
             [ (0, [[]]),
