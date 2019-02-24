@@ -31,4 +31,12 @@ isAdjunctRule (TermRule c x) = False
 ------------------------------------------------------------------
 -- IMPORTANT: Please do not change anything above here.
 --            Write all your code below this line.
+------------------------------------------------------------------
 
+-- A
+val :: (Ord nt, Ord t, Semiring a) => GenericCFG nt t a -> [t] -> a
+val cfg ts = big_gdisj [ gconj (init cfg x) (fastInside cfg ts x) | x <- (allNTs cfg)]
+
+-- B
+-- boolToCount :: GenericCFG nt t Bool -> GenericCFG nt t Int
+-- boolToCount (starts, rules) = TBD
