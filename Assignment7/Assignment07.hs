@@ -47,8 +47,8 @@ instance Semiring Int where
 -- B
 boolToCount :: GenericCFG nt t Bool -> GenericCFG nt t Int
 boolToCount (starts, rules) =
-    ([(c, case p of {False -> 0; True -> 1}) | (c,p) <- starts],
-    [(r, case p of {False -> 0; True -> 1}) | (r,p) <- rules])
+    ([(c, case p of {False -> gfalse; True -> gtrue}) | (c,p) <- starts],
+    [(r, case p of {False -> gfalse; True -> gtrue}) | (r,p) <- rules])
 
 -- C Semiring
 instance Semiring [Double] where
@@ -114,10 +114,6 @@ instance Semiring Cost  where
     gfalse = Inf
 
 -- F & G Helper
-boolToCost :: Bool -> Cost
-boolToCost p = case p of {False -> gfalse; True -> gtrue}
-
--- F & G Helper
 boolAndRuleToCost :: (Eq nt) => Bool -> RewriteRule nt t -> Cost
 boolAndRuleToCost p r = case p of {False -> gfalse; True ->
                     case (isCompoundRule r) of
@@ -129,7 +125,7 @@ boolAndRuleToCost p r = case p of {False -> gfalse; True ->
 -- F
 boolToLowestCost :: (Eq nt) => GenericCFG nt t Bool -> GenericCFG nt t Cost
 boolToLowestCost (starts, rules) =
-    let newStarts = map (\(c, p) -> (c, boolToCost p)) starts in
+    let newStarts = map (\(c, p) -> (c, case p of {False -> gfalse; True -> gtrue})) starts in
     let newRules = map (\(r, p) -> (r, boolAndRuleToCost p r)) rules in
         (newStarts, newRules)
 
@@ -140,19 +136,26 @@ instance Semiring (Cost, [[RewriteRule nt t]])  where
                         (gconj costX costY, gconj listOfRulesX listOfRulesY)
     gdisj x y = let (costX, listOfRulesX) = x in
                     let (costY, listOfRulesY) = y in
-                        (gdisj costX costY, gdisj listOfRulesX listOfRulesY)
-    gtrue = (TheInt 0, [[]])
-    gfalse = (Inf, [])
-
--- G Helper
-boolToListOfRuleLists :: Bool -> [[RewriteRule nt t]]
-boolToListOfRuleLists p = case p of {True -> gtrue; False -> gfalse}
+                    case costX of
+                        Inf -> case costY of
+                            Inf -> (gdisj costX costY, gdisj listOfRulesX listOfRulesY)
+                            TheInt intY -> y
+                        TheInt intX -> case costY of
+                            Inf -> x
+                            TheInt intY -> case (intX == intY) of
+                                True -> (gdisj costX costY, gdisj listOfRulesX listOfRulesY)
+                                False -> case (intX < intY) of
+                                            True -> x
+                                            False -> y     
+    gtrue = (gtrue, gtrue)
+    gfalse = (gfalse, gfalse)
 
 -- G Helper
 boolAndRuleToListOfRuleLists :: Bool -> RewriteRule nt t -> [[RewriteRule nt t]]
 boolAndRuleToListOfRuleLists p r = case p of {True -> [[r]]; False -> gfalse}
 
+-- G
 boolToLowestCostDerivs :: (Eq nt) => GenericCFG nt t Bool -> GenericCFG nt t (Cost, [[RewriteRule nt t]])
 boolToLowestCostDerivs (starts, rules) =
-    ([(c, (boolToCost p, boolToListOfRuleLists p)) | (c,p) <- starts],
+    ([(c, case p of {True -> gtrue; False -> gfalse}) | (c,p) <- starts],
     [(r, (boolAndRuleToCost p r, boolAndRuleToListOfRuleLists p r)) | (r,p) <- rules])
